@@ -1,0 +1,201 @@
+public class CustomerHomePageController {
+    
+     public class AccountWrapper {
+        @AuraEnabled public String accountName{Get;Set;}
+        @AuraEnabled public String phone {Get;Set;}
+        @AuraEnabled public String shoeSize {Get;Set;}
+        @AuraEnabled public String shirtSize {Get;Set;}
+        @AuraEnabled public String accountEmail {Get;Set;}
+        @AuraEnabled public String ownerId {Get;Set;}
+
+    }
+	
+    @AuraEnabled(cacheable=true) 
+    public static Integer getCode(){
+
+		return Math.round((Math.random() * (900000) + 100000));
+
+	}
+    
+    @AuraEnabled  
+    public static AccountWrapper getRecords(string recId){
+        try{
+        //Account accObj = [Select Id,Shoe_Sizes__c,Phone,Name,T_Shirt_Size__c,Email__c,OwnerId from Account where Id =: recId LIMIT 1];
+        String accountQuery = 'Select Id,Shoe_Sizes__c,Phone,Name,T_Shirt_Size__c,Email__c,OwnerId from Account where Id =\''+recId+'\'' + 'WITH SECURITY_ENFORCED LIMIT 1';
+        String jsonBody=''; 
+        jsonBody = '{"accountQuery" :'+JSON.serialize(accountQuery)+'}';
+        system.debug('jsonBody--> '+jsonBody);
+        
+        HttpRequest request = new HttpRequest();
+        request.setEndpoint('callout:CustomerHelperApp'+'/services/apexrest/getAccount');
+        request.setMethod('POST');
+        request.setHeader('Content-Type','application/json'); 
+        request.setBody(jsonBody);
+        request.setTimeout(15000);
+        
+        Http http = new Http();
+        HttpResponse response = new HttpResponse();
+        response=http.send(request);	
+        system.debug(response.getstatuscode());
+        SObject accObj ;
+        if(response.getstatuscode() == 200){
+            String json =response.getBody();
+            Map<string,list<sObject>> mapOfSobjects = (Map<string,list<sObject>>)system.JSON.deserialize(json ,Map<string,list<sObject>>.class );
+            accObj=mapOfSobjects.get('accountRes')[0];
+            system.debug(accObj);
+            
+            
+        }else if(response.getstatuscode() == 500){
+            throw new AuraHandledException('Error Occured: Cannot retrieve Account records.');
+        }
+
+        AccountWrapper AccountWrapperObj = new AccountWrapper();
+        if(accObj != null){
+            AccountWrapperObj.accountName = String.valueOf(accObj.get('Name'));
+            AccountWrapperObj.phone = String.valueOf(accObj.get('Phone'));
+            AccountWrapperObj.shoeSize = String.valueOf(accObj.get('Shoe_Sizes__c'));
+            AccountWrapperObj.shirtSize = String.valueOf(accObj.get('T_Shirt_Size__c')); 
+            AccountWrapperObj.accountEmail = String.valueOf(accObj.get('Email__c')); 
+            AccountWrapperObj.ownerId = String.valueOf(accObj.get('OwnerId')); 
+            system.debug(AccountWrapperObj);     
+
+        } 
+        return AccountWrapperObj;
+    	}
+    	catch (Exception e) {
+            system.debug(
+                'CustomerHomePageController getRecords error ---> ' +
+                    e.getLineNumber() +
+                    '  ' +
+                    e.getMessage()
+            );
+            AuraHandledException AuraError = new AuraHandledException(
+                e.getMessage()
+            );
+            AuraError.setMessage(e.getMessage());
+            throw AuraError;
+        }
+    }
+    
+    @AuraEnabled
+    public static String sendCode(String code,String email,String accountName,String ownerId) {
+       try{
+        List<Messaging.SingleEmailMessage> emails = new List<Messaging.SingleEmailMessage>();
+
+        if(email != null ){
+            List<String> toAddresses = new List<String>();
+            toAddresses.add(email);
+            
+            String body = 'Hello '+accountName +','+'<br/>'+ '<br/>';
+            body += 'Here is your code for verification '+code+ '<br/>' + '<br/>';
+            body += 'Thank You';
+            Messaging.SingleEmailMessage singleMail = new Messaging.SingleEmailMessage();
+            String orgId = '0D25g000000fzjyCAA';
+            singleMail.setOrgWideEmailAddressId(orgId);
+            singleMail.setSubject('Verification Code - '+accountName);  
+            singleMail.setHtmlBody(body);
+            //singleMail.setTargetObjectId(ownerId);
+            singleMail.setToAddresses(toAddresses);
+            emails.add(singleMail);
+        }
+        
+
+        //send mail
+       // Messaging.sendEmail(emails);
+        return code;
+    }
+        
+          catch (Exception e) {
+            system.debug(
+                'CustomerHomePageController sendCode error ---> ' +
+                    e.getLineNumber() +
+                    '  ' +
+                    e.getMessage()
+            );
+            AuraHandledException AuraError = new AuraHandledException(
+                e.getMessage()
+            );
+            AuraError.setMessage(e.getMessage());
+            throw AuraError;
+        }
+    }
+    
+    @AuraEnabled   
+    public static String saveRecords(string recId,string accountPhone ,string shirtSize,string shoeSize,string email){
+        try{
+            String recordId = CustomerHomePageController.updateRecords( recId,accountPhone ,shirtSize,shoeSize,email);
+            if(recordId != null){
+              ProfileAuthorization.DoCallout(recId ,email , shirtSize , shoeSize );
+            }
+            return recordId;
+        }
+          catch (Exception e) {
+            system.debug(
+                'CustomerHomePageController saveRecords error ---> ' +
+                    e.getLineNumber() +
+                    '  ' +
+                    e.getMessage()
+            );
+            AuraHandledException AuraError = new AuraHandledException(
+                e.getMessage()
+            );
+            AuraError.setMessage(e.getMessage());
+            throw AuraError;
+        }
+        
+    }
+
+    @AuraEnabled   
+    public static String updateRecords(string recId,string accountPhone ,string shirtSize,string shoeSize,string email){
+        
+            Account accObj = new Account(
+                Id = recId,
+                Phone = accountPhone,
+                Shoe_Sizes__c = shoeSize,
+                T_Shirt_Size__c = shirtSize,
+                Profile_Completed__c = true
+                
+            );
+
+            if(accObj != null){
+              
+                String jBody='';
+                list<Account> listOfSobject=new list<Account>();
+                listOfSobject.add(accObj);
+                
+                jBody = '{"sObjectList" : '+json.serialize(listOfSobject)+'}';
+                
+
+                HttpRequest request = new HttpRequest();
+                request.setEndpoint('callout:CustomerHelperApp/services/apexrest/dmlRecords');
+                request.setMethod('POST');
+                request.setHeader('Content-Type','application/json'); 
+                request.setBody(jBody);
+                request.setTimeout(15000);
+                
+                
+                Http http = new Http();
+                HttpResponse response = new HttpResponse();
+                response=http.send(request);	
+                if(response.getstatuscode() == 200){
+                    String json = response.getBody();
+                    recId = (Id) system.JSON.deserialize(json ,Id.class );
+                    
+                }
+                else if(response.getstatuscode() == 500){
+                    system.debug('body--> '+response.getBody());
+                    throw new AuraHandledException('Error Occured: Cannot Save Account record.');
+                }
+                
+                  else if(response.getstatuscode() == 401){
+                    system.debug('body--> '+response.getBody());
+                    throw new AuraHandledException('Error Occured: Cannot Save Account record.');
+                }
+                
+                system.debug('recId--> '+recId);
+                return recId;
+            }
+            return null;
+
+    }
+}
