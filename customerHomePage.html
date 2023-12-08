@@ -1,0 +1,111 @@
+<template>
+
+    <template if:true={showModal}>
+        <div data-id="toastModel"  class="toastPostion">
+            <div class="slds-notify_container slds-is-relative">
+                <div class={mainDivClass} role="status">
+                    <span class="slds-assistive-text">{variant}</span>
+                    <span class={messageDivClass} title={message}>
+                    <lightning-icon icon-name={iconName} size="small" variant="inverse"></lightning-icon>
+                    </span>
+                    <div  >
+                        <h2 class="slds-text-heading_small ">{message}</h2>
+                    </div>
+                    <div class="slds-notify__close">
+                        <button class="slds-button slds-button_icon slds-button_icon-inverse" title="Close" onclick={closeModal}>
+                            <lightning-icon icon-name="utility:close" size="small" variant="inverse"> </lightning-icon>
+                            <span class="slds-assistive-text">Close</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template if:false={validate}>
+        <header class="header dflex padding1">
+            <div >
+                Verification Page
+            </div>
+        </header>
+        <template if:false={codeSent}>
+
+            <div class="dflex padding1">
+                <lightning-button class="footerButton" label="Send Code" icon-name="utility:anywhere_chat" title="Send Code"
+                onclick={handleSendCode}></lightning-button>
+            </div>
+            <!-- <div onclick={handleSendCode} title="Submit">
+                <lightning-icon icon-name="utility:save" size="x-small"></lightning-icon>
+                Send Code
+            </div> -->
+        </template>
+        <template if:true={codeSent}>
+            <div class="dflex">
+                <div class="padding1">
+                    <lightning-input type="number" onchange={handleCodeChange} value={enteredCode} label="Verification Code" variant="label-hidden"></lightning-input>
+                </div>
+                <div class="padding1">
+                    <lightning-button class="footerButton" label="Submit" icon-name="utility:approval" title="Submit"
+                    onclick={handleValidate}></lightning-button>
+                </div>
+            </div>
+        </template>
+    </template>
+    
+    <template if:true={validate}>
+
+        <header class="header dflex padding1">
+            <div >
+                ABC Fashion Co. (Basic Details)
+            </div>
+        </header>
+        <div class="dflex ">
+            <div class="padding2">
+                <lightning-input type="text" value={accountName} label="Account Name"
+                disabled></lightning-input>
+            </div>
+
+            <div class="padding2">
+                <lightning-input type="tel" value={accountPhone}
+                label="Phone" required = "true" onchange={handlePhoneChange}></lightning-input>
+            </div>
+
+            <div class="padding2">
+                <lightning-input type="date" value={birtDate}
+                label="DOB" required = "true" onchange={handleDateChange}></lightning-input>
+            </div>
+
+            <div class="padding2">
+                <c-dynamic-picklist picklist-label="Shoe Size" object-api-name="Account"
+                    field-name="Shoe_Sizes__c" selected-value={shoeSize}
+                    required-field="true" placeholder="Select Value" 
+                    onpicklistchange={onShoeSizeChange}>
+                </c-dynamic-picklist>
+            </div>
+
+            <div class="padding2">
+                <c-dynamic-picklist picklist-label="Shoe Size" object-api-name="Account"
+                    field-name="T_Shirt_Size__c" selected-value={shirtSize}
+                    required-field="true" placeholder="Select Value" 
+                    onpicklistchange={onShirtSizeChange}>
+                </c-dynamic-picklist>
+            </div>
+        </div>
+
+
+        <div class="dflex">
+
+         <div class="padding1">
+            <lightning-button class="footerButton" label="Cancel" variant="destructive"
+            icon-name="utility:delete" title="Cancel" onclick={handleCancel}></lightning-button>
+         </div>
+
+          <div class="padding1">
+            <lightning-button class="footerButton" label="Save" icon-name="utility:save" title="Save"
+            onclick={handleSave}></lightning-button>
+          </div>
+        </div>
+
+    </template>
+
+</template>
