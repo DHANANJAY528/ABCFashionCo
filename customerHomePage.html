@@ -28,6 +28,13 @@
                 Verification Page
             </div>
         </header>
+        <template if:true={profileCompleted}>
+            <div class = "dflex">
+                <div>
+                    (This account is alerady completed , To update please request the code verification )
+                </div>
+            </div>
+        </template>
         <template if:false={codeSent}>
 
             <div class="dflex padding1">
@@ -71,7 +78,7 @@
             </div>
 
             <div class="padding2">
-                <lightning-input type="date" value={birtDate}
+                <lightning-input type="date" value={birthDate}
                 label="DOB" required = "true" onchange={handleDateChange}></lightning-input>
             </div>
 
