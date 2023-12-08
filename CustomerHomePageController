@@ -7,6 +7,8 @@ public class CustomerHomePageController {
         @AuraEnabled public String shirtSize {Get;Set;}
         @AuraEnabled public String accountEmail {Get;Set;}
         @AuraEnabled public String ownerId {Get;Set;}
+        @AuraEnabled public String birthDate {Get;Set;}
+        @AuraEnabled public Boolean profileCompleted {Get;Set;}
 
     }
 	
@@ -21,7 +23,7 @@ public class CustomerHomePageController {
     public static AccountWrapper getRecords(string recId){
         try{
         //Account accObj = [Select Id,Shoe_Sizes__c,Phone,Name,T_Shirt_Size__c,Email__c,OwnerId from Account where Id =: recId LIMIT 1];
-        String accountQuery = 'Select Id,Shoe_Sizes__c,Phone,Name,T_Shirt_Size__c,Email__c,OwnerId from Account where Id =\''+recId+'\'' + 'WITH SECURITY_ENFORCED LIMIT 1';
+        String accountQuery = 'Select Id,Shoe_Sizes__c,Birth_Date__c,Profile_Completed__c,Phone,Name,T_Shirt_Size__c,Email__c,OwnerId from Account where Id =\''+recId+'\'' + 'WITH SECURITY_ENFORCED LIMIT 1';
         String jsonBody=''; 
         jsonBody = '{"accountQuery" :'+JSON.serialize(accountQuery)+'}';
         system.debug('jsonBody--> '+jsonBody);
@@ -57,6 +59,8 @@ public class CustomerHomePageController {
             AccountWrapperObj.shirtSize = String.valueOf(accObj.get('T_Shirt_Size__c')); 
             AccountWrapperObj.accountEmail = String.valueOf(accObj.get('Email__c')); 
             AccountWrapperObj.ownerId = String.valueOf(accObj.get('OwnerId')); 
+            AccountWrapperObj.birthDate = String.valueOf(accObj.get('Birth_Date__c')); 
+            AccountWrapperObj.profileCompleted = Boolean.valueOf(accObj.get('Profile_Completed__c')); 
             system.debug(AccountWrapperObj);     
 
         } 
@@ -101,7 +105,7 @@ public class CustomerHomePageController {
         
 
         //send mail
-       // Messaging.sendEmail(emails);
+       	Messaging.sendEmail(emails);
         return code;
     }
         
@@ -121,11 +125,12 @@ public class CustomerHomePageController {
     }
     
     @AuraEnabled   
-    public static String saveRecords(string recId,string accountPhone ,string shirtSize,string shoeSize,string email){
+    public static String saveRecords(string recId,string accountPhone ,string shirtSize,string shoeSize,string email,String dob){
         try{
-            String recordId = CustomerHomePageController.updateRecords( recId,accountPhone ,shirtSize,shoeSize,email);
+            Date birthDate = Date.valueOf(dob);
+            String recordId = CustomerHomePageController.updateRecords( recId,accountPhone ,shirtSize,shoeSize,email,birthDate);
             if(recordId != null){
-              ProfileAuthorization.DoCallout(recId ,email , shirtSize , shoeSize );
+              CustomerHomePageController.DoCallout(recId ,email , shirtSize , shoeSize );
             }
             return recordId;
         }
@@ -146,13 +151,14 @@ public class CustomerHomePageController {
     }
 
     @AuraEnabled   
-    public static String updateRecords(string recId,string accountPhone ,string shirtSize,string shoeSize,string email){
+    public static String updateRecords(string recId,string accountPhone ,string shirtSize,string shoeSize,string email,Date dob){
         
             Account accObj = new Account(
                 Id = recId,
                 Phone = accountPhone,
                 Shoe_Sizes__c = shoeSize,
                 T_Shirt_Size__c = shirtSize,
+                Birth_Date__c = dob,
                 Profile_Completed__c = true
                 
             );
@@ -198,4 +204,102 @@ public class CustomerHomePageController {
             return null;
 
     }
+    
+    public static void DoCallout(String accId,String email,String shirtSize,String shoeSize) {
+        
+        Map<String,Object> resultMap = new Map<String,Object>(); 
+        Map<String,String> headerMap= new Map<String,String>{'Content-Type'=>'application/json'};
+        String endpointURL = 'https://integrations.commutatus.com/webhook/719ce78d-c2c5-47a8-986a-39d7e7a5652d';   
+        String  jsonBody = '{'
+                                    +'"email": "'+email+'",'
+                                    +'"tshirtSize": "'+shirtSize+'",'
+                                    +'"shoeSize": "'+Decimal.valueOf(shoeSize)+'"'
+                                +'}';
+         
+
+         
+        Http httpObject = new Http();
+        HttpRequest request = new HttpRequest();
+        request.setEndpoint(endpointURL);
+        request.setMethod('POST');
+        request.setBody(jsonBody);
+        request.setTimeout(15000);
+        //Set Headers
+        for(String key: headerMap.keySet()){
+            request.setHeader(key, headerMap.get(key));
+        }
+
+        HttpResponse response = httpObject.send(request);
+        String responseBody = response.getBody();
+        String customerId;
+        System.debug('responseBody: ' + responseBody);
+        
+        if(responseBody != null){
+        	resultMap = (Map<String,Object>)JSON.deserializeUntyped(response.getBody());
+            system.debug('resultMap'+resultMap);
+        
+            if(resultMap != null && resultMap.containsKey('status') && resultMap.get('status') == 'success' 
+               && resultMap.containsKey('customer_id') && resultMap.get('customer_id') != null){
+                
+                	customerId = String.valueOf(resultMap.get('customer_id'));
+                
+            }
+        
+            if(!String.isEmpty(customerId)){
+                Account accObj = new Account(
+                	Id = accId,
+                    Loyalty_Customer_ID__c = customerId
+                );
+                if(accObj != null){
+              
+                String jBody='';
+                list<Account> listOfSobject=new list<Account>();
+                listOfSobject.add(accObj);
+                
+                jBody = '{"sObjectList" : '+json.serialize(listOfSobject)+'}';
+                
+
+                HttpRequest requestDml = new HttpRequest();
+                requestDml.setEndpoint('callout:CustomerHelperApp'+'/services/apexrest/dmlRecords');
+                requestDml.setMethod('POST');
+                requestDml.setHeader('Content-Type','application/json'); 
+                requestDml.setBody(jBody);
+                requestDml.setTimeout(15000);
+                
+                Http http = new Http();
+                HttpResponse responseDml = new HttpResponse();
+                responseDml=http.send(requestDml);
+                system.debug(responseDml.getBody());
+                 system.debug(responseDml.getstatuscode());   
+                if(responseDml.getstatuscode() == 200){
+                    String json = responseDml.getBody();
+                    system.debug('here');
+                    accId = (Id) system.JSON.deserialize(json ,Id.class );
+                    
+                }
+                else if(responseDml.getstatuscode() == 500){
+                    system.debug('body--> '+responseDml.getBody());
+                    throw new AuraHandledException('Error Occured: Cannot Save Account record.');
+                }
+                
+                  else if(responseDml.getstatuscode() == 401){
+                    system.debug('body--> '+responseDml.getBody());
+                    throw new AuraHandledException('Error Occured: Cannot Save Account record.');
+                }
+                
+                system.debug('accId--> '+accId);
+                system.debug('accObj--> '+accObj);
+                //update accObj;
+               // return accId;
+            }
+                /*if(Account.SObjectType.getDescribe().isUpdateable()){
+                    update acc;
+                }*/
+            }
+            
+            
+    	}
+    	
+
+	}
 }
