@@ -1,0 +1,16 @@
+<apex:page lightningStylesheets="true" sidebar="false" standardStylesheets="false" controller="CustomerHomePageVFController">
+    <apex:slds />
+ <apex:includeLightning />
+    <div  id="lightning" />
+  <script >
+     $Lightning.use("c:customerHomePageApp", function() {
+         $Lightning.createComponent("c:customerHomePage",
+             {recordId : "{!recordIdAtt}"},
+             "lightning",
+             function(cmp) {
+                  console.log("Customer home page loaded.");
+             }															
+         );
+     });
+  </script>
+</apex:page>
