@@ -22,6 +22,7 @@ export default class CustomerHomePage extends LightningElement {
     @track ownerId;
     @track codeSent = false;
     @track birthDate;
+    @track profileCompleted = false;
 
     phoneRegex = /^(1\s?)?(\d{3}|\(\d{3}\))[\s\-]?\d{3}[\s\-]?\d{4}$/;
 
@@ -40,7 +41,6 @@ export default class CustomerHomePage extends LightningElement {
         if (data) {
 
             this.code = data;
-            console.log(this.code);
             this.error = undefined;
 
         } else if (error) {
@@ -51,7 +51,7 @@ export default class CustomerHomePage extends LightningElement {
 
     connectedCallback() {
          getRecords({ recId: this.recordId }).then(data => {
-                console.log(data);
+               
                 if (data) {
                     this.shoeSize = data.shoeSize;
                     this.shirtSize = data.shirtSize;
@@ -60,6 +60,7 @@ export default class CustomerHomePage extends LightningElement {
                     this.accountEmail = data.accountEmail;
                     this.ownerId = data.ownerId;
                     this.birthDate = data.birthDate;
+                    this.profileCompleted = data.profileCompleted;
                     this.error = undefined;
 
                 }
@@ -108,8 +109,7 @@ export default class CustomerHomePage extends LightningElement {
         }
 
         else{
-            console.log('Incorrect'+this.enteredCode);
-            console.log('Incorrect'+this.code);
+           
             this.message='Please check the verfication code';
             this.variant = 'error';
             this.showModal = true;
@@ -121,7 +121,7 @@ export default class CustomerHomePage extends LightningElement {
     handleSendCode(){
        
             sendCode({ code: this.code, email: this.accountEmail, accountName: this.accountName, ownerId: this.ownerId }).then(result => {
-                console.log(result);
+                
                 if (result) {
                     this.codeSent = true;
                 }
@@ -160,7 +160,7 @@ export default class CustomerHomePage extends LightningElement {
             }
             else{
                 saveRecords({ recId: this.recordId, accountPhone: this.accountPhone, shirtSize: this.shirtSize, shoeSize: this.shoeSize,dob : this.birthDate }).then(result => {
-                console.log(result);
+               
                 if (result) {
                     this.message='Record saved successfully.';
                     this.variant = 'success';
